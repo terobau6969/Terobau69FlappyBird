@@ -31,7 +31,7 @@ let bottomColumn2;
 const VELOCITY_X = 15;
 const VELOCITY_Y = -150;
 const COLUMN_VELOCITY_X = -70;
-const WIN_POSITION_X = 750;
+const STOP_POSITION_X = 350;
 
 function preload() {
   this.load.image('background', 'assets/background.png');
@@ -62,9 +62,9 @@ function update() {
     bird.setVelocityY(VELOCITY_Y);
   }
 
- // updateBirdVelocity();
- // checkCollisions.call(this);
-    updateColumns();
+  updateBirdVelocity();
+  checkCollisions.call(this);
+  updateColumns();
 }
 
 function createBackground() {
@@ -130,15 +130,15 @@ function createBird() {
   bird = this.physics.add.sprite(0, 50, 'bird').setScale(2);
   bird.setBounce(0.2);
   bird.setCollideWorldBounds(true);
-  //this.physics.add.overlap(bird, this.physics.add.staticGroup(), () => (hasLanded = true), null, this);
-  //this.physics.add.collider(bird, this.physics.add.staticGroup());
+  this.physics.add.overlap(bird, this.physics.add.staticGroup(), () => (hasLanded = true), null, this);
+  this.physics.add.collider(bird, this.physics.add.staticGroup());
   bird.setDepth(4);
 }
 
 function createControls() {
   cursors = this.input.keyboard.createCursorKeys();
-  //this.physics.add.overlap(bird, [topColumns, bottomColumns], () => (hasBumped = true), null, this);
-  //this.physics.add.collider(bird, [topColumns, bottomColumns]);
+  this.physics.add.overlap(bird, [topColumn1, topColumn2, bottomColumn1, bottomColumn2], () => (hasBumped = true), null, this);
+  this.physics.add.collider(bird, [topColumn1, topColumn2, bottomColumn1, bottomColumn2]);
 }
 
 function createMessage() {
@@ -173,7 +173,7 @@ function startGame() {
   });
 }
 
-/*function updateBirdVelocity() {
+function updateBirdVelocity() {
   if (!hasLanded || !hasBumped) {
     bird.body.velocity.x = VELOCITY_X;
   }
@@ -183,18 +183,25 @@ function startGame() {
     stopColumns();
   }
 
-  if (bird.x > WIN_POSITION_X) {
-    bird.setVelocityY(40);
-    messageToPlayer.text = `Congrats! You won!`;
+  if (bird.x > STOP_POSITION_X) {
+    bird.setVelocityY(0);
   }
 }
 
 function stopColumns() {
-  topColumns.children.iterate((column) => {
+  topColumn1.children.iterate((column) => {
     column.setVelocityX(0);
   });
 
-  bottomColumns.children.iterate((column) => {
+  bottomColumn1.children.iterate((column) => {
+    column.setVelocityX(0);
+  });
+
+  topColumn2.children.iterate((column) => {
+    column.setVelocityX(0);
+  });
+
+  bottomColumn2.children.iterate((column) => {
     column.setVelocityX(0);
   });
 }
@@ -203,32 +210,32 @@ function checkCollisions() {
   if (hasLanded || hasBumped) {
     messageToPlayer.text = `Oh no! You crashed!`;
   }
-}*/
+}
 
 function updateColumns() {
 
-  topColumn1.children.iterate((column, index) => {
+  topColumn1.children.iterate((column) => {
     if (column.x < -column.width) {
       column.x = 900 ;
       column.y = Phaser.Math.Between(0, -120);
     }
   });
 
-  bottomColumn1.children.iterate((column, index) => {
+  bottomColumn1.children.iterate((column) => {
     if (column.x < -column.width) {
       column.x = 900 ;
       column.y = Phaser.Math.Between(450, 600);
     }
   });
 
-  topColumn2.children.iterate((column, index) => {
+  topColumn2.children.iterate((column) => {
     if (column.x < -column.width) {
       column.x = 900;
       column.y = Phaser.Math.Between(0, -120);
     }
   });
 
-  bottomColumn2.children.iterate((column, index) => {
+  bottomColumn2.children.iterate((column) => {
     if (column.x < -column.width) {
       column.x = 900 ;
       column.y = Phaser.Math.Between(450, 600);
