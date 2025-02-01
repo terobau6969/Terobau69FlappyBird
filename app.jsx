@@ -41,7 +41,7 @@ let line2;
 let line3;
 let line4;
 let line5;
-let line6;
+
 
 const VELOCITY_X = 15;
 const VELOCITY_Y = -150;
@@ -110,11 +110,6 @@ function  createLines() {
     setXY: { x: 1650, y: window.innerHeight - 90, stepX: 350},
   });
 
-  line6 = this.physics.add.group({
-    key: 'line',
-    repeat: 0,
-    setXY: { x: 1950, y: window.innerHeight - 90, stepX: 350},
-  });
 
   line1.children.iterate((line) => {
     line.setScale(0.1,0.02);
@@ -151,12 +146,6 @@ function  createLines() {
     line.setDepth(4);
   });
 
-  line6.children.iterate((line) => {
-    line.setScale(0.1,0.02);
-    line.body.allowGravity = false;
-    line.setVelocityX(0);
-    line.setDepth(4);
-  });
 }
 
 function createColumns() {
@@ -285,8 +274,11 @@ function createColumns() {
 
 function createBird() {
   bird = this.physics.add.sprite(100, 100, 'bird').setScale(2);
+  bird.setVelocity(-100,0);
   bird.setBounce(0.2);
   bird.setCollideWorldBounds(true);
+
+  bird.body.allowGravity = false;
 
   this.physics.add.overlap(bird, roads, () => (hasLanded = true), null, this);
   this.physics.add.collider(bird, roads);
@@ -314,10 +306,14 @@ function createMessage() {
 function update() {
   if (cursors.space.isDown && !isGameStarted) {
     startGame.call(this)
-  }
+    }
+  if (isGameStarted) {
 
-  if (cursors.up.isDown && !hasLanded && !hasBumped) {
+    if (cursors.up.isDown && !hasLanded && !hasBumped) {
     bird.setVelocityY(VELOCITY_Y);
+    }
+  } else {
+    bird.setVelocity(0, 0);
   }
   checkCollisions.call(this);
   updateBirdVelocity.call(this);
@@ -327,6 +323,7 @@ function update() {
 
 function startGame() {
   isGameStarted = true;
+  bird.body.allowGravity = true;
   messageToPlayer.text = 'Instructions: Press the "^" button to stay upright\n          and don\'t hit the columns or ground';
 
   topColumn1.children.iterate((column) => {
@@ -389,18 +386,10 @@ function startGame() {
     line.setVelocityX(COLUMN_VELOCITY_X);
   });
 
-  line6.children.iterate((line) => {
-    line.setVelocityX(COLUMN_VELOCITY_X);
-  });
 
 }
 
 function updateBirdVelocity() {
-  
-  if (!hasLanded || !hasBumped && !isGameStarted) {
-    bird.body.velocity.x = VELOCITY_X;
-  }
-
   if (hasLanded || hasBumped) {
     bird.body.velocity.x = 0;
     bird.setVelocityY(500);
@@ -487,9 +476,6 @@ function stopLines() {
     line.setVelocityX(0);
   });
 
-  line6.children.iterate((line) => {
-    line.setVelocityX(0);
-  });
 }
 
 function checkCollisions() {
@@ -575,28 +561,28 @@ function updateLines() {
 
  line1.children.iterate((line) => {
     if (line.x < -50) {
-      line.x = this.scale.width;
+      line.x = this.scale.width +90;
       line.y = window.innerHeight - 90;
     }
   });
 
   line2.children.iterate((line) => {
     if (line.x < -50) {
-      line.x = this.scale.width;
+      line.x = this.scale.width +90;
       line.y = window.innerHeight - 90;
     }
   });
 
   line3.children.iterate((line) => { 
     if (line.x < -50) {
-      line.x = this.scale.width;
+      line.x = this.scale.width +90;
       line.y = window.innerHeight - 90;
     }
   });
 
   line4.children.iterate((line) => {
     if (line.x < -50) {
-      line.x = this.scale.width;
+      line.x = this.scale.width +90;
       line.y = window.innerHeight - 90;
     }
   });
@@ -608,12 +594,6 @@ function updateLines() {
     }
   });
 
-  line6.children.iterate((line) => {
-    if (line.x < -50) {
-      line.x = this.scale.width;
-      line.y = window.innerHeight - 90;
-    }
-  }); 
 }
 
 window.addEventListener('resize', () => {
