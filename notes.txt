@@ -1,8 +1,4 @@
-1. bird landed needs to be fixed
-2. need to add margin for everything to be 30% of screenneed to adjust elements for the fullscreen 
-3. need to adjust elements for the fullscreen 
-4. columns move when bird hits them, need to make that static
-
-
-  const roadTop = road.y - road.displayHeight / 2;
-  console.log('Top of the road:', roadTop);
+Potential Future updates:
+1. Custom visuals
+2. Add score system
+3. Add better game ui
