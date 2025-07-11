@@ -24,9 +24,9 @@ const PIPE_SPACING = 300;    // Horizontal spacing between pipe pairs
 const PIPE_GAP_SIZE = 150;   // Vertical gap between top and bottom pipe
 const PIPE_MIN_Y = 100;      // Min gap center y-position
 const PIPE_MAX_Y = 400;      // Max gap center y-position
-
+const FORWARD_VELOCITY_X = 60; // You can adjust this value for speed
 const VELOCITY_Y = -150;
-const STOP_POSITION_X = 350;
+const STOP_POSITION_X = 600;
 
 let bird;
 let cursors;
@@ -50,6 +50,9 @@ function preload() {
 
 function create() {
   createBackground.call(this);
+  this.gameWidth = this.scale.width;
+  this.gameHeight = this.scale.height;
+  this.backgroundHeight = background.displayHeight;
   createRoad.call(this);
   createLines.call(this);
   createBird.call(this);
@@ -114,7 +117,7 @@ function createColumns() {
   const totalPairs = Math.floor(window.innerWidth / PIPE_SPACING) + 2;
 
   // Start columns *on screen* spaced evenly
-  const startX = 600; // Start first pipe at PIPE_SPACING from left edge
+  const startX = 750; // Start first pipe at PIPE_SPACING from left edge
 
   for (let i = 0; i < totalPairs; i++) {
     const x = startX + i * PIPE_SPACING;
@@ -197,9 +200,11 @@ function update() {
       bird.setVelocityY(VELOCITY_Y);
     }
 
-    if (bird.x > STOP_POSITION_X) {
-      bird.setVelocityX(0);
-    }
+    if (bird.x < STOP_POSITION_X) {
+    bird.setVelocityX(FORWARD_VELOCITY_X);
+  } else {
+    bird.setVelocityX(0);
+  }
 
     updatePipes.call(this);
     updateLines.call(this);
@@ -229,6 +234,14 @@ function startGame() {
   });
 }
 
+function setVelocityXForGroup(groupArray, velocityX) {
+  groupArray.forEach((group) => {
+    group.children.iterate((child) => {
+      child.setVelocityX(velocityX);
+    });
+  });
+}
+
 function resetGame() {
   isGameStarted = false;
   hasLanded = false;
@@ -241,7 +254,7 @@ function resetGame() {
   bird.setVelocity(0, 0);
   bird.body.allowGravity = false;
 
-  const startX = 600; // also reset pipe positions to start on screen
+  const startX = 750; // also reset pipe positions to start on screen
 
   pipePairs.forEach(({ topPipe, bottomPipe }, i) => {
     const x = startX + i * PIPE_SPACING;
@@ -267,8 +280,29 @@ function resetGame() {
   });
 }
 
+
+function getRightMostPipeX() {
+  let rightMostX = 0;
+  pipePairs.forEach(({ topPipe }) => {
+    if (topPipe.x > rightMostX) rightMostX = topPipe.x;
+  });
+  return rightMostX;
+}
+
+function updateLines() {
+  lineGroups.forEach((group) => {
+    group.children.iterate((line) => {
+      if (line.x < -50) {
+        line.x = this.gameWidth + 90;
+        line.y = this.gameHeight - 90;
+      }
+    });
+  });
+}
+
 function updatePipes() {
   pipePairs.forEach(({ topPipe, bottomPipe }) => {
+    // If the pipe has moved off screen (fully to the left)
     if (topPipe.x + topPipe.displayWidth < 0) {
       const rightMostX = getRightMostPipeX();
       const newX = rightMostX + PIPE_SPACING;
@@ -285,40 +319,25 @@ function updatePipes() {
   });
 }
 
-function getRightMostPipeX() {
-  let rightMostX = 0;
-  pipePairs.forEach(({ topPipe }) => {
-    if (topPipe.x > rightMostX) rightMostX = topPipe.x;
-  });
-  return rightMostX;
-}
-
-function updateLines() {
-  lineGroups.forEach((group) => {
-    group.children.iterate((line) => {
-      if (line.x < -50) {
-        line.x = game.scale.width + 90;
-        line.y = window.innerHeight - 90;
-      }
-    });
-  });
-}
 
 function stopPipes() {
   pipePairs.forEach(({ topPipe, bottomPipe }) => {
-    topPipe.setVelocityX(0);
-    bottomPipe.setVelocityX(0);
+    [topPipe, bottomPipe].forEach(pipe => pipe.setVelocityX(0));
   });
 }
 
+
+
 function stopLines() {
-  lineGroups.forEach((group) => {
-    group.children.iterate((line) => {
-      line.setVelocityX(0);
-    });
-  });
+  setVelocityXForGroup(lineGroups, 0);
 }
 
 window.addEventListener('resize', () => {
   game.scale.resize(window.innerWidth, window.innerHeight);
+  const scene = game.scene.getScene();
+  if (scene) {
+    scene.gameWidth = scene.scale.width;
+    scene.gameHeight = scene.scale.height;
+    if (background) scene.backgroundHeight = background.displayHeight;
+  }
 });
