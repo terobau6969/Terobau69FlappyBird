@@ -1,4 +1,3 @@
-
 export default class HowToPlayScene extends Phaser.Scene {
   constructor() {
     super('HowToPlayScene');

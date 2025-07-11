@@ -8,10 +8,14 @@ export default class GameScene extends Phaser.Scene {
     this.load.image('road', 'assets/road.png');
     this.load.image('line', 'assets/line.png');
     this.load.image('column', 'assets/column.png');
-    this.load.spritesheet('bird', 'assets/bird.png', { frameWidth: 64, frameHeight: 96 });
+    this.load.image('backArrow', 'assets/backarrow.png');
+    this.load.spritesheet('bird2', 'assets/bird2.png', { frameWidth: 64, frameHeight: 96 });
+    this.load.spritesheet('bird3', 'assets/bird3.png', { frameWidth: 64, frameHeight: 96 });
+    this.load.spritesheet('bird1', 'assets/bird1.png', { frameWidth: 64, frameHeight: 96 });
   }
 
   create() {
+    // Constants
     this.PIPE_VELOCITY_X = -170;
     this.PIPE_SPACING = 300;
     this.PIPE_GAP_SIZE = 150;
@@ -21,6 +25,7 @@ export default class GameScene extends Phaser.Scene {
     this.VELOCITY_Y = -150;
     this.STOP_POSITION_X = 600;
 
+    // Game state flags
     this.isGameStarted = false;
     this.hasLanded = false;
     this.hasBumped = false;
@@ -28,19 +33,40 @@ export default class GameScene extends Phaser.Scene {
     this.lineGroups = [];
     this.pipePairs = [];
 
+    // Create game objects
     this.createBackground();
     this.createRoad();
     this.createLines();
     this.createBird();
     this.createColumns();
     this.createControls();
+
+    // Create message text
     this.createMessage();
 
-    this.physics.add.collider(this.bird, this.roads, () => this.hasLanded = true);
+    // Back button
+    this.backButton = this.add.image(30, 30, 'backArrow').setInteractive({ useHandCursor: true }).setDepth(10);
+    this.backButton.setScale(0.4);
+
+    this.backButton.on('pointerdown', () => {
+      this.cameras.main.fadeOut(400, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('MenuScene');
+      });
+    });
+
+    // Add collisions AFTER all relevant objects exist
+    this.physics.add.collider(this.bird, this.roads, () => {
+      this.hasLanded = true;
+    });
 
     this.pipePairs.forEach(({ topPipe, bottomPipe }) => {
-      this.physics.add.collider(this.bird, topPipe, () => this.hasBumped = true);
-      this.physics.add.collider(this.bird, bottomPipe, () => this.hasBumped = true);
+      this.physics.add.collider(this.bird, topPipe, () => {
+        this.hasBumped = true;
+      });
+      this.physics.add.collider(this.bird, bottomPipe, () => {
+        this.hasBumped = true;
+      });
     });
   }
 
@@ -119,7 +145,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   createBird() {
-    this.bird = this.physics.add.sprite(100, 100, 'bird').setScale(2);
+    const selectedBirdKey = localStorage.getItem('selectedBird') || 'bird1';
+    this.bird = this.physics.add.sprite(100, 100, selectedBirdKey);
+    this.bird.setScale(1);
     this.bird.setBounce(0.2);
     this.bird.setCollideWorldBounds(true);
     this.bird.body.allowGravity = false;

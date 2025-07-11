@@ -1,3 +1,4 @@
+
 export default class LeaderboardScene extends Phaser.Scene {
     constructor() {
         super('LeaderboardScene');
