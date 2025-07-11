@@ -14,39 +14,31 @@ const config = {
     create,
     update,
   },
-  }
-
+};
 
 const game = new Phaser.Game(config);
-let isGameStarted = false;
+
+// Constants for pipe logic
+const PIPE_VELOCITY_X = -170;
+const PIPE_SPACING = 300;    // Horizontal spacing between pipe pairs
+const PIPE_GAP_SIZE = 150;   // Vertical gap between top and bottom pipe
+const PIPE_MIN_Y = 100;      // Min gap center y-position
+const PIPE_MAX_Y = 400;      // Max gap center y-position
+
+const VELOCITY_Y = -150;
+const STOP_POSITION_X = 350;
+
 let bird;
-let hasLanded = false;
-let hasBumped = false;
 let cursors;
 let messageToPlayer;
-let topColumn1;
-let bottomColumn1;
-let topColumn2;
-let bottomColumn2;
-let topColumn3;
-let bottomColumn3;
-let topColumn4;
-let bottomColumn4;
-let topColumn5;
-let bottomColumn5;
-let roads;
 let background;
-let line1;
-let line2;
-let line3;
-let line4;
-let line5;
+let roads;
+let lineGroups = [];
+let pipePairs = [];
 
-
-const VELOCITY_X = 15;
-const VELOCITY_Y = -150;
-const COLUMN_VELOCITY_X = -70;
-const STOP_POSITION_X = 350;
+let isGameStarted = false;
+let hasLanded = false;
+let hasBumped = false;
 
 function preload() {
   this.load.image('background', 'assets/background.png');
@@ -59,14 +51,20 @@ function preload() {
 function create() {
   createBackground.call(this);
   createRoad.call(this);
-  createColumns.call(this);
-  createLines.call(this)
+  createLines.call(this);
   createBird.call(this);
+  createColumns.call(this);
   createControls.call(this);
   createMessage.call(this);
+
+  // Setup collisions after bird and pipes exist
+  pipePairs.forEach(({ topPipe, bottomPipe }) => {
+    this.physics.add.collider(bird, topPipe, () => { hasBumped = true; }, null, this);
+    this.physics.add.collider(bird, bottomPipe, () => { hasBumped = true; }, null, this);
+  });
+
+  this.physics.add.collider(bird, roads, () => { hasLanded = true; }, null, this);
 }
-
-
 
 function createBackground() {
   background = this.add.image(0, 0, 'background').setOrigin(0, 0).setDepth(0);
@@ -76,524 +74,249 @@ function createBackground() {
 
 function createRoad() {
   roads = this.physics.add.staticGroup();
-  roads.create(window.innerWidth / 2, window.innerHeight - 90, 'road').setScale(2).refreshBody().setDepth(3);
-  }
 
-function  createLines() {
-  line1 = this.physics.add.group({
-    key: 'line',
-    repeat: 0,
-    setXY: { x: 250, y: window.innerHeight - 90, stepX: 350 },
+  // Create the road sprite at bottom center of the screen
+  const roadSprite = roads.create(window.innerWidth / 2, window.innerHeight - 85, 'road');
+
+  // Stretch width and height as needed
+  roadSprite.setDisplaySize(window.innerWidth, 150);  // Stretch width only (maintain aspect ratio for height)
+  roadSprite.setDepth(3);
+  roadSprite.refreshBody();
+}
+
+
+function createLines() {
+  lineGroups = [];
+  const linePositionsX = [250, 600, 950, 1300, 1650];
+
+  linePositionsX.forEach((posX) => {
+    let lineGroup = this.physics.add.group({
+      key: 'line',
+      repeat: 0,
+      setXY: { x: posX, y: window.innerHeight - 90 },
+      immovable: true,
+      allowGravity: false,
+    });
+
+    lineGroup.children.iterate((line) => {
+      line.setScale(0.1, 0.02);
+      line.body.allowGravity = false;
+      line.setVelocityX(0);
+      line.setDepth(4);
+    });
+
+    lineGroups.push(lineGroup);
   });
-
-  line2 = this.physics.add.group({
-    key: 'line',
-    repeat: 0,
-    setXY: { x: 600, y: window.innerHeight - 90, stepX: 350},
-  });
-
-  line3 = this.physics.add.group({
-    key: 'line',
-    repeat: 0,
-    setXY: { x: 950, y: window.innerHeight - 90, stepX: 350},
-  });
-
-  line4 = this.physics.add.group({
-    key: 'line',
-    repeat: 0,
-    setXY: { x: 1300, y: window.innerHeight - 90, stepX: 350},
-  });
-
-  line5 = this.physics.add.group({
-    key: 'line',
-    repeat: 0,
-    setXY: { x: 1650, y: window.innerHeight - 90, stepX: 350},
-  });
-
-
-  line1.children.iterate((line) => {
-    line.setScale(0.1,0.02);
-    line.body.allowGravity = false;
-    line.setVelocityX(0);
-    line.setDepth(4);
-  });
-
-  line2.children.iterate((line) => {
-    line.setScale(0.1,0.02);
-    line.body.allowGravity = false;
-    line.setVelocityX(0);
-    line.setDepth(4);
-  });
-
-  line3.children.iterate((line) => {
-    line.setScale(0.1,0.02);
-    line.body.allowGravity = false;
-    line.setVelocityX(0);
-    line.setDepth(4);
-  });
-
-  line4.children.iterate((line) => {
-    line.setScale(0.1,0.02);
-    line.body.allowGravity = false;
-    line.setVelocityX(0);
-    line.setDepth(4);
-  });
-
-  line5.children.iterate((line) => {
-    line.setScale(0.1,0.02);
-    line.body.allowGravity = false;
-    line.setVelocityX(0);
-    line.setDepth(4);
-  });
-
 }
 
 function createColumns() {
-  topColumn1 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 300, y: Phaser.Math.Between(0, 50), stepX: 150 },
-  });
+  pipePairs = [];
+  const totalPairs = Math.floor(window.innerWidth / PIPE_SPACING) + 2;
 
-  bottomColumn1 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 450, y: Phaser.Math.Between(450, 700), stepX: 150 },
-  });
+  // Start columns *on screen* spaced evenly
+  const startX = 600; // Start first pipe at PIPE_SPACING from left edge
 
-  topColumn2 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 600, y: Phaser.Math.Between(0, 50), stepX: 150 },
-  });
+  for (let i = 0; i < totalPairs; i++) {
+    const x = startX + i * PIPE_SPACING;
 
-  bottomColumn2 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 750, y: Phaser.Math.Between(450, 700), stepX: 150 },
-  });
+    const gapY = Phaser.Math.Between(PIPE_MIN_Y, PIPE_MAX_Y);
 
-  topColumn3 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 900, y: Phaser.Math.Between(0, 50), stepX: 150 },
-  });
+    // Top pipe
+    const topPipe = this.physics.add.sprite(x, gapY - PIPE_GAP_SIZE / 2, 'column');
+    topPipe.setOrigin(0.5, 1);
+    topPipe.displayHeight = gapY;
+    topPipe.body.allowGravity = false;
+    topPipe.body.immovable = true;        // <-- Make immovable to avoid falling on collision
+    topPipe.setVelocityX(0);
+    topPipe.setDepth(2);
 
-  bottomColumn3 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 1050, y: Phaser.Math.Between(450, 700), stepX: 150 },
-  });
+    // Bottom pipe
+    const bottomPipe = this.physics.add.sprite(x, gapY + PIPE_GAP_SIZE / 2, 'column');
+    bottomPipe.setOrigin(0.5, 0);
+    bottomPipe.displayHeight = background.displayHeight - bottomPipe.y;
+    bottomPipe.body.allowGravity = false;
+    bottomPipe.body.immovable = true;     // <-- Make immovable
+    bottomPipe.setVelocityX(0);
+    bottomPipe.setDepth(2);
 
-  topColumn4 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 1200, y: Phaser.Math.Between(0, 50), stepX: 150 },
-  });
-
-  bottomColumn4 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 1350, y: Phaser.Math.Between(450, 700), stepX: 150 },
-  });
-
-  topColumn5 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 1500, y: Phaser.Math.Between(0, 50), stepX: 150 },
-  });
-
-  bottomColumn5 = this.physics.add.group({
-    key: 'column',
-    repeat: 0,
-    setXY: { x: 1650, y: Phaser.Math.Between(450, 700), stepX: 150 },
-  });
-
-  topColumn1.children.iterate((column) => {
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0); 
-    column.setDepth(2);
-  });
-
-  bottomColumn1.children.iterate((column) => {
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
-  topColumn2.children.iterate((column) => { 
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setVelocityY(0);
-    column.setDepth(2);
-  });
-
-  bottomColumn2.children.iterate((column) => {
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
-  topColumn3.children.iterate((column) => {
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
-  bottomColumn3.children.iterate((column) => {  
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
-  topColumn4.children.iterate((column) => { 
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
-  bottomColumn4.children.iterate((column) => {
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
-  topColumn5.children.iterate((column) => {
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
-  bottomColumn5.children.iterate((column) => {
-    column.body.setAllowGravity(false);
-    column.setVelocityX(0);
-    column.setDepth(2);
-  });
-
+    pipePairs.push({ topPipe, bottomPipe });
+  }
 }
 
 function createBird() {
   bird = this.physics.add.sprite(100, 100, 'bird').setScale(2);
-  bird.setVelocity(-100,0);
   bird.setBounce(0.2);
   bird.setCollideWorldBounds(true);
-
   bird.body.allowGravity = false;
-
-  this.physics.add.overlap(bird, roads, () => (hasLanded = true), null, this);
-  this.physics.add.collider(bird, roads);
+  bird.setVelocity(0, 0);
   bird.setDepth(4);
 }
 
 function createControls() {
   cursors = this.input.keyboard.createCursorKeys();
-  this.physics.add.overlap(bird, [topColumn1, topColumn2, topColumn3, topColumn4, topColumn5, bottomColumn1, bottomColumn2, bottomColumn3, bottomColumn4, bottomColumn5], () => (hasBumped = true), null, this);
-  this.physics.add.collider(bird, [topColumn1, topColumn2, topColumn3, topColumn4, topColumn5, bottomColumn1, bottomColumn2, bottomColumn3, bottomColumn4, bottomColumn5]);
 }
 
 function createMessage() {
-  messageToPlayer = this.add.text(0, 0, `Instructions: Press space bar to start`, {
-    fontFamily: '"Comic Sans MS", Times, serif',
-    fontSize: '32px',
-    color: 'white',
-    backgroundColor: 'black',
-  });
-  Phaser.Display.Align.In.BottomCenter(messageToPlayer, background, 250, 250);
+  messageToPlayer = this.add.text(
+    this.scale.width / 2,
+    this.scale.height - 60,
+    'Press SPACE to start',
+    {
+      fontFamily: '"Comic Sans MS", Times, serif',
+      fontSize: '32px',
+      color: 'white',
+      backgroundColor: 'black',
+      padding: { x: 10, y: 10 },
+    }
+  );
+  messageToPlayer.setOrigin(0.5, 0.5);
   messageToPlayer.setDepth(5);
 }
 
-
 function update() {
   if (cursors.space.isDown && !isGameStarted) {
-    startGame.call(this)
-    }
-  if (isGameStarted) {
+    startGame.call(this);
+  }
 
-    if (cursors.up.isDown && !hasLanded && !hasBumped) {
-    bird.setVelocityY(VELOCITY_Y);
+  if (hasLanded || hasBumped) {
+    messageToPlayer.text = 'Oh no! You crashed! Press SPACE to restart';
+    if (cursors.space.isDown) {
+      resetGame.call(this);
     }
+    stopPipes();
+    stopLines();
+    bird.setVelocityY(500);
+    bird.body.allowGravity = true;
+    if (hasLanded) bird.setAngle(270);
+    if (hasBumped) bird.setAngle(90);
+    return;
+  }
+
+  if (isGameStarted) {
+    if (cursors.up.isDown && !hasLanded && !hasBumped) {
+      bird.setVelocityY(VELOCITY_Y);
+    }
+
+    if (bird.x > STOP_POSITION_X) {
+      bird.setVelocityX(0);
+    }
+
+    updatePipes.call(this);
+    updateLines.call(this);
   } else {
     bird.setVelocity(0, 0);
   }
-  checkCollisions.call(this);
-  updateBirdVelocity.call(this);
-  updateColumns.call(this);
-  updateLines.call(this);
 }
 
 function startGame() {
   isGameStarted = true;
+  hasLanded = false;
+  hasBumped = false;
+
   bird.body.allowGravity = true;
-  messageToPlayer.text = 'Instructions: Press the "^" button to stay upright\n          and don\'t hit the columns or ground';
+  bird.setAngle(0);
+  messageToPlayer.text = 'Press UP to stay upright. Avoid pipes and ground!';
 
-  topColumn1.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-   
-  bottomColumn1.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
+  pipePairs.forEach(({ topPipe, bottomPipe }) => {
+    topPipe.setVelocityX(PIPE_VELOCITY_X);
+    bottomPipe.setVelocityX(PIPE_VELOCITY_X);
   });
 
-  topColumn2.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
+  lineGroups.forEach((group) => {
+    group.children.iterate((line) => {
+      line.setVelocityX(PIPE_VELOCITY_X);
+    });
   });
-
-  bottomColumn2.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  topColumn3.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  bottomColumn3.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  topColumn4.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  bottomColumn4.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  topColumn5.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  bottomColumn5.children.iterate((column) => {
-    column.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  line1.children.iterate((line) => {
-    line.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  line2.children.iterate((line) => {
-    line.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  line3.children.iterate((line) => {
-    line.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  line4.children.iterate((line) => {
-    line.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-  line5.children.iterate((line) => {
-    line.setVelocityX(COLUMN_VELOCITY_X);
-  });
-
-
 }
 
-function updateBirdVelocity() {
-  if (hasLanded || hasBumped) {
-    bird.body.velocity.x = 0;
-    bird.setVelocityY(500);
-    stopColumns();
-    stopLines();
-  }
+function resetGame() {
+  isGameStarted = false;
+  hasLanded = false;
+  hasBumped = false;
 
-  if (hasLanded) {
-    bird.setAngle(270)
-    };
-  
-  if (hasBumped) {
-    bird.setAngle(90)
-  }
+  messageToPlayer.text = 'Press SPACE to start';
 
-  if (bird.x > 350) {
-    bird.setVelocityX(0);
-  }
+  bird.setPosition(100, 100);
+  bird.setAngle(0);
+  bird.setVelocity(0, 0);
+  bird.body.allowGravity = false;
 
+  const startX = 600; // also reset pipe positions to start on screen
+
+  pipePairs.forEach(({ topPipe, bottomPipe }, i) => {
+    const x = startX + i * PIPE_SPACING;
+    const gapY = Phaser.Math.Between(PIPE_MIN_Y, PIPE_MAX_Y);
+
+    topPipe.x = x;
+    topPipe.displayHeight = gapY;
+    topPipe.y = gapY - PIPE_GAP_SIZE / 2;
+    topPipe.setVelocityX(0);
+
+    bottomPipe.x = x;
+    bottomPipe.y = gapY + PIPE_GAP_SIZE / 2;
+    bottomPipe.displayHeight = background.displayHeight - bottomPipe.y;
+    bottomPipe.setVelocityX(0);
+  });
+
+  lineGroups.forEach((group, idx) => {
+    const positions = [250, 600, 950, 1300, 1650];
+    group.children.iterate((line) => {
+      line.x = positions[idx];
+      line.setVelocityX(0);
+    });
+  });
 }
 
+function updatePipes() {
+  pipePairs.forEach(({ topPipe, bottomPipe }) => {
+    if (topPipe.x + topPipe.displayWidth < 0) {
+      const rightMostX = getRightMostPipeX();
+      const newX = rightMostX + PIPE_SPACING;
+      const gapY = Phaser.Math.Between(PIPE_MIN_Y, PIPE_MAX_Y);
 
+      topPipe.x = newX;
+      topPipe.displayHeight = gapY;
+      topPipe.y = gapY - PIPE_GAP_SIZE / 2;
 
-function stopColumns() {
-  topColumn1.children.iterate((column) => {
-    column.setVelocity(0);
+      bottomPipe.x = newX;
+      bottomPipe.y = gapY + PIPE_GAP_SIZE / 2;
+      bottomPipe.displayHeight = background.displayHeight - bottomPipe.y;
+    }
   });
+}
 
-  bottomColumn1.children.iterate((column) => {
-    column.setVelocity(0);
+function getRightMostPipeX() {
+  let rightMostX = 0;
+  pipePairs.forEach(({ topPipe }) => {
+    if (topPipe.x > rightMostX) rightMostX = topPipe.x;
   });
+  return rightMostX;
+}
 
-  topColumn2.children.iterate((column) => {
-    column.setVelocity(0);
+function updateLines() {
+  lineGroups.forEach((group) => {
+    group.children.iterate((line) => {
+      if (line.x < -50) {
+        line.x = game.scale.width + 90;
+        line.y = window.innerHeight - 90;
+      }
+    });
   });
+}
 
-  bottomColumn2.children.iterate((column) => {
-    column.setVelocity(0);
-  });
-
-  topColumn3.children.iterate((column) => {
-    column.setVelocity(0);
-  });
-
-  bottomColumn3.children.iterate((column) => {
-    column.setVelocity(0);
-  });
-
-  topColumn4.children.iterate((column) => {
-    column.setVelocity(0);
-  });
-
-  bottomColumn4.children.iterate((column) => {
-    column.setVelocity(0);
-  });
-
-  topColumn5.children.iterate((column) => {
-    column.setVelocity(0);
-  });
-
-  bottomColumn5.children.iterate((column) => {
-    column.setVelocity(0);
+function stopPipes() {
+  pipePairs.forEach(({ topPipe, bottomPipe }) => {
+    topPipe.setVelocityX(0);
+    bottomPipe.setVelocityX(0);
   });
 }
 
 function stopLines() {
- line1.children.iterate((line) => {
-    line.setVelocityX(0);
+  lineGroups.forEach((group) => {
+    group.children.iterate((line) => {
+      line.setVelocityX(0);
+    });
   });
-
-  line2.children.iterate((line) => {
-    line.setVelocityX(0);
-  });
-
-  line3.children.iterate((line) => {
-    line.setVelocityX(0);
-  });
-
-  line4.children.iterate((line) => {
-    line.setVelocityX(0);
-  });
-
-  line5.children.iterate((line) => {
-    line.setVelocityX(0);
-  });
-
-}
-
-function checkCollisions() {
-  if (hasLanded || hasBumped) {
-    messageToPlayer.text = `Oh no! You crashed!`;
-  }
-}
-
-function updateColumns() {
-
-  topColumn1.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(0, -120);
-    }
-  });
-
-  bottomColumn1.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(450, 600);
-    }
-  });
-
-  topColumn2.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(0, -120);
-    }
-  });
-
-  bottomColumn2.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(450, 600);
-    }
-  });
-
-  topColumn3.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(0, -120);
-    }
-  });
-
-  bottomColumn3.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(450, 600);
-    }
-  });
-
-  topColumn4.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(0, -120);
-    }
-  });
-
-  bottomColumn4.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(450, 600);
-    }
-  });
-
-  topColumn5.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(0, -120);
-    }
-  });
-
-  bottomColumn5.children.iterate((column) => {
-    if (column.x < -column.width) {
-      column.x = this.scale.width;
-      column.y = Phaser.Math.Between(450, 600);
-    }
-  });
-}
-
-function updateLines() {
-
- line1.children.iterate((line) => {
-    if (line.x < -50) {
-      line.x = this.scale.width +90;
-      line.y = window.innerHeight - 90;
-    }
-  });
-
-  line2.children.iterate((line) => {
-    if (line.x < -50) {
-      line.x = this.scale.width +90;
-      line.y = window.innerHeight - 90;
-    }
-  });
-
-  line3.children.iterate((line) => { 
-    if (line.x < -50) {
-      line.x = this.scale.width +90;
-      line.y = window.innerHeight - 90;
-    }
-  });
-
-  line4.children.iterate((line) => {
-    if (line.x < -50) {
-      line.x = this.scale.width +90;
-      line.y = window.innerHeight - 90;
-    }
-  });
-
-  line5.children.iterate((line) => {
-    if (line.x < -50) {
-      line.x = this.scale.width + 90;
-      line.y = window.innerHeight - 90;
-    }
-  });
-
 }
 
 window.addEventListener('resize', () => {
